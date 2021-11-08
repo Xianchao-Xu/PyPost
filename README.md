@@ -1,6 +1,7 @@
-# PyPrePost
-使用PyQt5+vtk+OpenCasCade实现的前后处理软件
+# PyFEM
+使用PyQt5+vtk+OpenCasCade实现的有限元分析软件
 
 ### v0.01
 * 完成了程序主界面
-* 可以显示点云数据
+* 可以显示点云数据、网格数据
+* 可以显示和隐藏坐标轴、点云、网格

@@ -11,36 +11,28 @@ from PyQt5.QtCore import (
     QByteArray,
     PYQT_VERSION_STR
 )
-from PyQt5.QtGui import (QIcon, QKeySequence, QCloseEvent)
+from PyQt5.QtGui import (
+    QIcon,
+    QKeySequence,
+    QCloseEvent
+)
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
     QVBoxLayout,
-    QHBoxLayout,
     QWidget,
-    QSplitter,
-    QFrame,
-    QLabel,
-    QSpinBox,
-    QSpacerItem,
     QFileDialog,
     QMessageBox,
     QAction,
-    QTreeWidget,
     QTreeWidgetItem,
-    QTabWidget,
-    QTextBrowser,
-    QSizePolicy
 )
 
-# noinspection PyUnresolvedReferences
-import vtkmodules.vtkRenderingOpenGL2  # 虽然后面没有用到，但必须导入这个，否则会报错
-from vtkmodules.vtkIOImage import vtkJPEGReader
+from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor as QVTKWidget
+from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonCore import (
     vtkPoints,
     vtkVersion
 )
-from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonDataModel import (
     VTK_VERTEX,
     VTK_POLY_VERTEX,
@@ -63,7 +55,6 @@ from vtkmodules.vtkCommonDataModel import (
     VTK_QUADRATIC_HEXAHEDRON,
     vtkUnstructuredGrid
 )
-from vtkmodules.vtkRenderingAnnotation import vtkAxesActor
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkInteractionWidgets import (
     vtkLogoWidget,
@@ -72,29 +63,24 @@ from vtkmodules.vtkInteractionWidgets import (
     vtkTextWidget,
     vtkTextRepresentation
 )
+from vtkmodules.vtkIOImage import vtkJPEGReader
+from vtkmodules.vtkRenderingAnnotation import vtkAxesActor
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
     vtkDataSetMapper,
     vtkRenderer,
     vtkTextActor
 )
-from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor as QVTKWidget
+# noinspection PyUnresolvedReferences
+import vtkmodules.vtkRenderingOpenGL2  # 虽然后面没有用到，但必须导入这个，否则会报错
 
+from ui.CentralWidget import CentralWidget
 from utility.FileParser import FileParser
 
-__version__ = '0.01'
+__version__ = '0.01.01'
 __author__ = 'XuXianchao'
 __organization__ = '仿真坊'
 __appname__ = 'PyFEM'
-
-TREE_TOP_LEVEL_NAMES = [
-    '坐标系',
-    '几何',
-    '网格',
-    '载荷',
-    '边界',
-    '结果'
-]
 
 NAMED_COLORS = [
     'cold_grey', 'dim_grey', 'grey', 'light_grey',
@@ -177,45 +163,16 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.setWindowTitle('{} - v{}'.format(__appname__, __version__))
 
-        # 中央窗体
-        self.central_widget = QWidget(self)
+        # 设置中央窗体（中央窗体已从主程序中分离出去）
+        self.central_widget = CentralWidget(self)
         self.central_widget.setObjectName('central_widget')
         self.setCentralWidget(self.central_widget)
-        # 中央窗体布局
-        self.vertical_layout = QVBoxLayout(self.central_widget)
-        self.vertical_layout.setObjectName('vertical_layout')
-
-        # 水平分割器
-        self.horizontal_splitter = QSplitter(self.central_widget)
-        self.horizontal_splitter.setOrientation(Qt.Horizontal)
-        self.horizontal_splitter.setObjectName('horizontal_splitter')
-        # 水平分割器添加左右部件，左边为模型树，右边为垂直分割器
-        # 添加模型树
-        self.tree_widget = QTreeWidget(self.horizontal_splitter)
-        self.tree_widget.setObjectName('tree_widget')
-        self.vertical_splitter = QSplitter(self.horizontal_splitter)
-        # 添加垂直分割器
-        self.vertical_splitter.setOrientation(Qt.Vertical)
-        self.vertical_splitter.setObjectName('vertical_splitter')
-        # 垂直分割器添加上下部件，上边为主视图tab，用于显示模型；下边为附加部件tab，用于显示信息，后续还可添加其他tab
-        # 添加视图tab
-        self.view_tab_widget = QTabWidget(self.vertical_splitter)
-        self.view_tab_widget.setObjectName('view_tab_widget')
-        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.view_tab_widget.setSizePolicy(size_policy)
-        # 添加附加部件tab
-        self.additional_tab_widget = QTabWidget(self.vertical_splitter)
-        self.additional_tab_widget.setObjectName('additional_tab_widget')
-        # 附加部件添加信息tab
-        self.info_tab = QWidget()
-        self.info_tab.setObjectName('info_tab')
-        self.additional_tab_widget.addTab(self.info_tab, '信息')
-        # 信息tab添加text browser用于显示信息
-        self.info_browser = QTextBrowser(self.additional_tab_widget)
-        self.info_browser.setObjectName('info_browser')
-        self.info_tab_layout = QVBoxLayout(self.info_tab)
-        self.info_tab_layout.setObjectName('info_tab_layout')
-        self.info_tab_layout.addWidget(self.info_browser)
+        self.horizontal_splitter = self.central_widget.horizontal_splitter
+        self.vertical_splitter = self.central_widget.vertical_splitter
+        self.navigation_tab = self.central_widget.navigation_tab
+        self.view_tab_widget = self.central_widget.view_tab_widget
+        self.tree_widget = self.central_widget.tree_widget
+        self.info_browser = self.central_widget.additional_tab_widget.info_browser
 
         # vtk相关控件
         self.vtk_widget = QVTKWidget()
@@ -231,17 +188,17 @@ class MainWindow(QMainWindow):
 
         # 添加其他控件
         self.add_menu()  # 添加菜单栏和工具栏
-        self.add_navigation_tab()  # 添加导航标签，用于放置各种控制按钮
-        self.init_tree_widget()
+
         self.add_vtk_view()  # 添加VTK视图
         self.init_vtk_view()  # VTK视图初始化
 
-        self.vertical_layout.addWidget(self.horizontal_splitter)
+        # 恢复上次关闭时的状态
+        self.load_settings()
 
         self.statusBar().showMessage('准备完毕', 5000)  # 添加状态栏
 
-        # 恢复上次关闭时的状态
-        self.load_settings()
+        self.navigation_tab.node_size_spinbox.valueChanged.connect(self.node_size_changed)
+        self.tree_widget.itemChanged.connect(self.show_hide_actor)
 
     @staticmethod
     def add_actions(target, actions):
@@ -261,11 +218,11 @@ class MainWindow(QMainWindow):
         file_toolbar = self.addToolBar('文件')
         file_toolbar.setObjectName('file_toolbar')
         file_new_action = self.create_action(
-            '新建', self.file_new, QKeySequence.New, 'Images/New.png', '新建文件')
+            '新建', self.file_new, QKeySequence.New, 'Icons/New.png', '新建文件')
         file_open_action = self.create_action(
-            '打开', self.file_open, QKeySequence.Open, 'Images/Open.png', '打开文件')
+            '打开', self.file_open, QKeySequence.Open, 'Icons/Open.png', '打开文件')
         file_exit_action = self.create_action(
-            '退出', self.close, 'Ctrl+Q', 'Images/Exit.png', '退出')
+            '退出', self.close, 'Ctrl+Q', 'Icons/Exit.png', '退出')
         self.add_actions(file_menu, (file_new_action, file_open_action, None, file_exit_action))
         self.add_actions(file_toolbar, (file_new_action, file_open_action, file_exit_action))
 
@@ -273,63 +230,12 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu('帮助')
         help_menu.setObjectName('help_menu')
         file_help_action = self.create_action(
-            '帮助', self.file_help, icon="Images/Help.png", tip='帮助')
+            '帮助', self.file_help, icon="Icons/Help.png", tip='帮助')
         file_about_action = self.create_action(
-            '关于', self.file_about, icon='Images/About.png', tip='关于')
+            '关于', self.file_about, icon='Icons/About.png', tip='关于')
         file_license_action = self.create_action(
-            '许可', self.file_license, QKeySequence.HelpContents, 'Images/License.png', '许可')
+            '许可', self.file_license, QKeySequence.HelpContents, 'Icons/License.png', '许可')
         self.add_actions(help_menu, (file_help_action, None, file_about_action, file_license_action))
-
-    def add_navigation_tab(self):
-        navigation_tab = QTabWidget()
-        navigation_tab.setObjectName('navigation_tab')
-        size_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        navigation_tab.setSizePolicy(size_policy)
-        self.vertical_layout.addWidget(navigation_tab)
-
-        self.add_view_navigation(navigation_tab)
-
-    def add_view_navigation(self, widget: QTabWidget):
-        view_navigation_tab = QWidget()
-        view_navigation_tab.setObjectName('view_navigation_tab')
-        widget.addTab(view_navigation_tab, '视图')
-
-        size_frame = QFrame()
-        size_frame.setFrameShape(QFrame.StyledPanel)
-        size_frame.setFrameShadow(QFrame.Sunken)
-        #
-        node_size_layout = QHBoxLayout()
-        node_size_label = QLabel('节点大小：')
-        node_size_spinbox = QSpinBox()
-        node_size_spinbox.setValue(5)
-        node_size_spinbox.setMinimum(1)
-        node_size_spinbox.setMaximum(10000)
-        node_size_layout.addWidget(node_size_label)
-        node_size_layout.addWidget(node_size_spinbox)
-        #
-        edge_size_layout = QHBoxLayout()
-        edge_size_label = QLabel('网格粗细：')
-        edge_size_spinbox = QSpinBox()
-        edge_size_spinbox.setMinimum(1)
-        edge_size_spinbox.setMaximum(10000)
-        edge_size_layout.addWidget(edge_size_label)
-        edge_size_layout.addWidget(edge_size_spinbox)
-        #
-        size_layout = QVBoxLayout()
-        size_layout.addLayout(node_size_layout)
-        size_layout.addLayout(edge_size_layout)
-        #
-        size_frame.setLayout(size_layout)
-
-        space_item = QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        view_navigation_layout = QHBoxLayout()
-        view_navigation_layout.addWidget(size_frame)
-        view_navigation_layout.addItem(space_item)
-
-        view_navigation_tab.setLayout(view_navigation_layout)
-
-        node_size_spinbox.valueChanged.connect(self.node_size_changed)
 
     def add_vtk_view(self):
         vtk_view_tab = QWidget()
@@ -397,7 +303,7 @@ class MainWindow(QMainWindow):
                             self.show_scatter(params)
                         elif params.type == 'mesh':
                             self.show_mesh(params)
-                        item_index = TREE_TOP_LEVEL_NAMES.index('网格')
+                        item_index = self.tree_widget.top_level_names.index('网格')
                         basename = os.path.splitext(os.path.basename(filename))[0]
                         mesh_item = QTreeWidgetItem(self.tree_widget.topLevelItem(item_index))
                         mesh_item.setText(0, '{}'.format(basename))
@@ -436,24 +342,6 @@ class MainWindow(QMainWindow):
             self, '许可', '{}采用MIT开源协议进行许可'.format(__appname__)
         )
 
-    def init_tree_widget(self):
-        self.tree_widget.setStyleSheet(
-            "QTreeWidget::indicator:unchecked {image: url(Images/Hide.png);}"
-            "QTreeWidget::indicator:checked {image: url(Images/Show.png);}"
-        )
-        self.tree_widget.setHeaderLabels(['', '编号', '颜色'])
-        self.tree_widget.setColumnWidth(0, 160)
-        self.tree_widget.setColumnWidth(1, 35)
-        self.tree_widget.setColumnWidth(2, 35)
-
-        self.tree_widget.itemChanged.connect(self.show_hide_actor)
-
-        for parent_name in TREE_TOP_LEVEL_NAMES:
-            parent = QTreeWidgetItem(self.tree_widget)
-            parent.setText(0, parent_name)
-            parent.setFlags(parent.flags() | Qt.ItemIsTristate | Qt.ItemIsUserCheckable)
-            parent.setCheckState(0, Qt.Checked)
-
     def init_vtk_view(self):
         self.renderer.SetBackground(0.9, 0.9, 0.9)
         self.render_window.AddRenderer(self.renderer)
@@ -473,7 +361,7 @@ class MainWindow(QMainWindow):
 
         # 添加logo
         png_reader = vtkJPEGReader()
-        png_reader.SetFileName('Images/qrcode.jpg')
+        png_reader.SetFileName('Icons/qrcode.jpg')
         png_reader.Update(None)  # 不加None的时候PyCharm要报"Parameter 'p_int' unfilled"
         logo_representation = vtkLogoRepresentation()
         logo_representation.SetImage(png_reader.GetOutput())
@@ -520,9 +408,9 @@ class MainWindow(QMainWindow):
 
     def node_size_changed(self, i):
         actor_index = self.actor_index
-        current_item_index = self.tree_widget.currentItem().text(1)
-        if current_item_index:
-            actor_index = int(current_item_index)
+        current_item = self.tree_widget.currentItem()
+        if current_item:
+            actor_index = int(current_item.text(1))
         if actor_index > 1:
             self.actors[actor_index].GetProperty().SetPointSize(i)
             self.render_window.Render()
@@ -559,6 +447,7 @@ class MainWindow(QMainWindow):
         actor = vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor(vtkNamedColors().GetColor3d(random.choice(NAMED_COLORS)))
+        actor.GetProperty().SetPointSize(int(self.navigation_tab.node_size_spinbox.text()))
         actor.GetProperty().EdgeVisibilityOn()
         actor.GetProperty().RenderPointsAsSpheresOn()
         self.actor_index += 1
@@ -586,7 +475,7 @@ class MainWindow(QMainWindow):
         actor = vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetColor(vtkNamedColors().GetColor3d(random.choice(NAMED_COLORS)))
-        actor.GetProperty().SetPointSize(10)
+        actor.GetProperty().SetPointSize(int(self.navigation_tab.node_size_spinbox.text()))
         actor.GetProperty().RenderPointsAsSpheresOn()
         self.actor_index += 1
         self.actors[self.actor_index] = actor
