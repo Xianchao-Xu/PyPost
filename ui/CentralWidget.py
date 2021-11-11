@@ -1,6 +1,13 @@
 # coding: utf-8
 # author: xuxc
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import (
+    Qt,
+    pyqtSignal
+)
+from PyQt5.QtGui import (
+    QMouseEvent,
+    QColor
+)
 from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -14,7 +21,8 @@ from PyQt5.QtWidgets import (
     QLabel,
     QSpinBox,
     QSpacerItem,
-    QTextBrowser
+    QTextBrowser,
+    QColorDialog
 )
 
 
@@ -69,6 +77,38 @@ class TopNavigationTab(QTabWidget):
         self.view_navigation_tab.setLayout(view_navigation_layout)
 
 
+class ClickableLabel(QLabel):
+    clicked = pyqtSignal()
+
+    def mouseReleaseEvent(self, ev: QMouseEvent) -> None:
+        if ev.button() == Qt.LeftButton:
+            self.clicked.emit()
+
+
+class ColorPickerWidget(QFrame):
+    clicked = pyqtSignal()
+
+    def __init__(self, color, parent=None):
+        super(ColorPickerWidget, self).__init__(parent)
+
+        self.color = color
+        self.label = ClickableLabel(self)
+        self.label.setStyleSheet('background-color: {}'.format(self.color))
+        layout = QHBoxLayout()
+        layout.addWidget(self.label)
+        layout.setContentsMargins(5, 5, 5, 5)
+        self.setLayout(layout)
+
+        self.label.clicked.connect(self.change_color)
+
+    def change_color(self):
+        dlg = QColorDialog()
+        color = dlg.getColor(initial=QColor(self.color))
+        if color.isValid():
+            self.color = color.name()
+            self.label.setStyleSheet('background-color: {}'.format(self.color))
+
+
 class ModelTree(QTreeWidget):
     def __init__(self, parent=None):
         super(ModelTree, self).__init__(parent)
@@ -86,6 +126,7 @@ class ModelTree(QTreeWidget):
             "QTreeWidget::indicator:unchecked {image: url(Icons/Hide.png);}"
             "QTreeWidget::indicator:checked {image: url(Icons/Show.png);}"
         )
+        self.header().setStretchLastSection(False)
 
         self.setHeaderLabels(['', '编号', '颜色'])
         self.setColumnWidth(0, 160)
@@ -160,6 +201,6 @@ if __name__ == '__main__':
     from PyQt5.QtWidgets import QApplication
 
     app = QApplication(sys.argv)
-    widget = CentralWidget()
+    widget = ColorPickerWidget(color='#ff0000')
     widget.show()
     app.exec_()

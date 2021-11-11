@@ -28,7 +28,6 @@ from PyQt5.QtWidgets import (
 )
 
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor as QVTKWidget
-from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonCore import (
     vtkPoints,
     vtkVersion
@@ -74,66 +73,16 @@ from vtkmodules.vtkRenderingCore import (
 # noinspection PyUnresolvedReferences
 import vtkmodules.vtkRenderingOpenGL2  # 虽然后面没有用到，但必须导入这个，否则会报错
 
-from ui.CentralWidget import CentralWidget
+from ui.CentralWidget import (
+    CentralWidget,
+    ColorPickerWidget
+)
 from utility.FileParser import FileParser
 
-__version__ = '0.01.01'
+__version__ = '0.01.02'
 __author__ = 'XuXianchao'
 __organization__ = '仿真坊'
 __appname__ = 'PyFEM'
-
-NAMED_COLORS = [
-    'cold_grey', 'dim_grey', 'grey', 'light_grey',
-    'slate_grey', 'slate_grey_dark', 'slate_grey_light',
-    'warm_grey'
-    'black', 'ivory_black', 'lamp_black',
-    'alizarin_crimson', 'brick', 'cadmium_red_deep', 'coral',
-    'coral_light', 'deep_pink', 'english_red', 'firebrick',
-    'geranium_lake', 'hot_pink', 'indian_red', 'light_salmon',
-    'madder_lake_deep', 'maroon', 'pink', 'pink_light',
-    'raspberry', 'red', 'rose_madder', 'salmon', 'tomato',
-    'venetian_red',
-    'beige', 'brown', 'brown_madder', 'brown_ochre',
-    'burlywood', 'burnt_sienna', 'burnt_umber', 'chocolate',
-    'deep_ochre', 'flesh', 'flesh_ochre', 'gold_ochre',
-    'greenish_umber', 'khaki', 'khaki_dark', 'light_beige',
-    'peru', 'rosy_brown', 'raw_sienna', 'raw_umber', 'sepia',
-    'sienna', 'saddle_brown', 'sandy_brown', 'tan',
-    'van_dyke_brown',
-    'cadmium_orange', 'cadmium_red_light', 'carrot',
-    'dark_orange', 'mars_orange', 'mars_yellow', 'orange',
-    'orange_red', 'yellow_ochre',
-    'aureoline_yellow', 'banana', 'cadmium_lemon',
-    'cadmium_yellow', 'cadmium_yellow_light', 'gold',
-    'goldenrod', 'goldenrod_dark', 'goldenrod_light',
-    'goldenrod_pale', 'light_goldenrod', 'melon',
-    'naples_yellow_deep', 'yellow', 'yellow_light',
-    'chartreuse', 'chrome_oxide_green', 'cinnabar_green',
-    'cobalt_green', 'emerald_green', 'forest_green', 'green',
-    'green_dark', 'green_pale', 'green_yellow', 'lawn_green',
-    'lime_green', 'mint', 'olive', 'olive_drab',
-    'olive_green_dark', 'permanent_green', 'sap_green',
-    'sea_green', 'sea_green_dark', 'sea_green_medium',
-    'sea_green_light', 'spring_green', 'spring_green_medium',
-    'terre_verte', 'viridian_light', 'yellow_green',
-    'aquamarine', 'aquamarine_medium', 'cyan', 'cyan_white',
-    'turquoise', 'turquoise_dark', 'turquoise_medium',
-    'turquoise_pale',
-    'alice_blue', 'blue', 'blue_light', 'blue_medium',
-    'cadet', 'cobalt', 'cornflower', 'cerulean', 'dodger_blue',
-    'indigo', 'manganese_blue', 'midnight_blue', 'navy',
-    'peacock', 'powder_blue', 'royal_blue', 'slate_blue',
-    'slate_blue_dark', 'slate_blue_light',
-    'slate_blue_medium', 'sky_blue', 'sky_blue_deep',
-    'sky_blue_light', 'steel_blue', 'steel_blue_light',
-    'turquoise_blue', 'ultramarine',
-    'blue_violet', 'cobalt_violet_deep', 'magenta',
-    'orchid', 'orchid_dark', 'orchid_medium',
-    'permanent_red_violet', 'plum', 'purple',
-    'purple_medium', 'ultramarine_violet', 'violet',
-    'violet_dark', 'violet_red', 'violet_red_medium',
-    'violet_red_pale'
-]
 
 VTK_ELEMENT_TYPE_TABLE = {
     1: VTK_VERTEX,
@@ -174,6 +123,10 @@ class MainWindow(QMainWindow):
         self.tree_widget = self.central_widget.tree_widget
         self.info_browser = self.central_widget.additional_tab_widget.info_browser
 
+        # 添加其他控件
+        self.add_menu()  # 添加菜单栏和工具栏
+        self.statusBar().showMessage('准备完毕', 5000)  # 添加状态栏并显示相关信息
+
         # vtk相关控件
         self.vtk_widget = QVTKWidget()
         self.render_window = self.vtk_widget.GetRenderWindow()
@@ -186,16 +139,11 @@ class MainWindow(QMainWindow):
         self.text_widget = vtkTextWidget()  # 用于放置软件名和版本号
         self.marker_widget = vtkOrientationMarkerWidget()  # 用于放置坐标轴
 
-        # 添加其他控件
-        self.add_menu()  # 添加菜单栏和工具栏
-
         self.add_vtk_view()  # 添加VTK视图
         self.init_vtk_view()  # VTK视图初始化
 
         # 恢复上次关闭时的状态
         self.load_settings()
-
-        self.statusBar().showMessage('准备完毕', 5000)  # 添加状态栏
 
         self.navigation_tab.node_size_spinbox.valueChanged.connect(self.node_size_changed)
         self.tree_widget.itemChanged.connect(self.show_hide_actor)
@@ -279,6 +227,15 @@ class MainWindow(QMainWindow):
 
         self.render_window.Render()
 
+        # 移除模型树“网格”标签下的所有actor分支
+        item_index = self.tree_widget.top_level_names.index('网格')
+        item = self.tree_widget.topLevelItem(item_index)
+        children = []
+        for child in range(item.childCount()):
+            children.append(item.child(child))
+        for child in children:
+            item.removeChild(child)
+
     def file_open(self):
         supported_files_list = {
             '自定义{}文件': '*.fem'.format(__appname__),
@@ -303,12 +260,6 @@ class MainWindow(QMainWindow):
                             self.show_scatter(params)
                         elif params.type == 'mesh':
                             self.show_mesh(params)
-                        item_index = self.tree_widget.top_level_names.index('网格')
-                        basename = os.path.splitext(os.path.basename(filename))[0]
-                        mesh_item = QTreeWidgetItem(self.tree_widget.topLevelItem(item_index))
-                        mesh_item.setText(0, '{}'.format(basename))
-                        mesh_item.setCheckState(0, Qt.Checked)
-                        mesh_item.setText(1, '{}'.format(self.actor_index))
                     self.info_browser.append(params.msg)
 
     def file_help(self):
@@ -415,6 +366,15 @@ class MainWindow(QMainWindow):
             self.actors[actor_index].GetProperty().SetPointSize(i)
             self.render_window.Render()
 
+    def change_color(self, actor_index):
+        color = self.sender().palette().window().color().name()
+        r_hex = int(color[1:3], 16)
+        g_hex = int(color[3:5], 16)
+        b_hex = int(color[5:7], 16)
+        r, g, b = r_hex/255, g_hex/255, b_hex/255
+        self.actors[actor_index].GetProperty().SetColor(r, g, b)
+        self.render_window.Render()
+
     def show_hide_actor(self, item: QTreeWidgetItem):
         if item.text(1):
             actor_index = int(item.text(1))
@@ -423,6 +383,26 @@ class MainWindow(QMainWindow):
             elif item.checkState(0) == Qt.Unchecked:
                 self.actors[actor_index].VisibilityOff()
             self.render_window.Render()
+
+    def add_actor(self, actor, actor_name, actor_color, parent_name):
+        self.actor_index += 1
+        self.actors[self.actor_index] = actor
+
+        self.renderer.AddActor(actor)
+        self.renderer.ResetCamera()
+
+        self.render_window.Render()
+
+        item_index = self.tree_widget.top_level_names.index(parent_name)
+        basename = os.path.splitext(os.path.basename(actor_name))[0]
+        mesh_item = QTreeWidgetItem(self.tree_widget.topLevelItem(item_index))
+        color_picker = ColorPickerWidget(color=actor_color)
+        actor_index = self.actor_index
+        color_picker.label.clicked.connect(lambda: self.change_color(actor_index))
+        mesh_item.setText(0, '{}'.format(basename))
+        mesh_item.setCheckState(0, Qt.Checked)
+        mesh_item.setText(1, '{}'.format(self.actor_index))
+        self.tree_widget.setItemWidget(mesh_item, 2, color_picker)
 
     def show_mesh(self, params):
         node_ids = params.node_ids
@@ -446,17 +426,17 @@ class MainWindow(QMainWindow):
 
         actor = vtkActor()
         actor.SetMapper(mapper)
-        actor.GetProperty().SetColor(vtkNamedColors().GetColor3d(random.choice(NAMED_COLORS)))
+        r, g, b = random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
+        actor.GetProperty().SetColor(r / 255, g / 255, b / 255)
         actor.GetProperty().SetPointSize(int(self.navigation_tab.node_size_spinbox.text()))
         actor.GetProperty().EdgeVisibilityOn()
         actor.GetProperty().RenderPointsAsSpheresOn()
-        self.actor_index += 1
-        self.actors[self.actor_index] = actor
 
-        self.renderer.AddActor(actor)
-        self.renderer.ResetCamera()
-
-        self.render_window.Render()
+        r_hex = hex(r)[2:].rjust(2, '0')
+        g_hex = hex(g)[2:].rjust(2, '0')
+        b_hex = hex(b)[2:].rjust(2, '0')
+        actor_color = '#{}{}{}'.format(r_hex, g_hex, b_hex)
+        self.add_actor(actor, params.filename, actor_color, '网格')
 
     def show_scatter(self, params):
         nodes = params.nodes
@@ -474,16 +454,16 @@ class MainWindow(QMainWindow):
 
         actor = vtkActor()
         actor.SetMapper(mapper)
-        actor.GetProperty().SetColor(vtkNamedColors().GetColor3d(random.choice(NAMED_COLORS)))
+        r, g, b = random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
+        actor.GetProperty().SetColor(r/255, g/255, b/255)
         actor.GetProperty().SetPointSize(int(self.navigation_tab.node_size_spinbox.text()))
         actor.GetProperty().RenderPointsAsSpheresOn()
-        self.actor_index += 1
-        self.actors[self.actor_index] = actor
 
-        self.renderer.AddActor(actor)
-        self.renderer.ResetCamera()
-
-        self.render_window.Render()
+        r_hex = hex(r)[2:].rjust(2, '0')
+        g_hex = hex(g)[2:].rjust(2, '0')
+        b_hex = hex(b)[2:].rjust(2, '0')
+        actor_color = '#{}{}{}'.format(r_hex, g_hex, b_hex)
+        self.add_actor(actor, params.filename, actor_color, '网格')
 
 
 if __name__ == '__main__':
