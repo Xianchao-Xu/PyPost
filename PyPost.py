@@ -82,7 +82,7 @@ from utility.FileParser import FileParser
 __version__ = '0.01.02'
 __author__ = 'XuXianchao'
 __organization__ = '仿真坊'
-__appname__ = 'PyFEM'
+__appname__ = 'PyPost'
 
 VTK_ELEMENT_TYPE_TABLE = {
     1: VTK_VERTEX,
